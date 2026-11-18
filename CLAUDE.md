@@ -73,3 +73,15 @@ minified build. `tools/cws.mjs` refuses to upload otherwise. Up to 3 fix
 attempts per failure, then contact the maintainer. Never add a bypass flag.
 The `release` and `watch` workflow jobs run only once repo variable
 `CWS_EXTENSION_ID` is set (after the first listing exists).
+
+## Claude usage limits in CI
+
+`store-fix.yml` survives Claude usage limits the same way as CrumbSweep.
+- **Waiting in place:** the agent waits inside its session
+  (`autoContinueAtUsageLimit`, 300-minute step timeout).
+- **Checkpoint and resume:** if the wait would run past the timeout,
+  `tools/usage-limit.mjs` saves the work to `resume/store-fix-<run>` and
+  `resume.yml` re-dispatches the run after the reset. `resume.yml` is
+  disabled while idle. The cap is 3 resumes, then it comments on the issue.
+- Keep `tools/usage-limit.mjs` identical to CrumbSweep's copy. It's
+  guard-protected.

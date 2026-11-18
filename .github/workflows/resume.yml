@@ -1,0 +1,31 @@
+name: Resume after usage limit
+
+# Normally DISABLED. tools/usage-limit.mjs enables it when a Claude run is
+# paused at the usage limit, and it disables itself again once nothing is
+# pending, so it costs nothing while idle. Every 30 minutes it re-dispatches
+# paused runs whose limit has reset, from their saved checkpoint.
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: resume
+  cancel-in-progress: false
+
+permissions:
+  contents: write # delete markers on automation/resume
+  actions: write # dispatch workflows, disable this one
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/usage-limit.mjs dispatch-due

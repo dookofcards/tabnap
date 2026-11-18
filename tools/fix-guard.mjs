@@ -20,7 +20,7 @@ const changed = git("diff", "--name-only", `${base}...${fix}`).split("\n").filte
 // Files that carry policy, privacy or pipeline meaning: any change needs a human.
 const SENSITIVE = [
   /^\.github\//, /^docs\/privacy-policy\.html$/, /^LICENSE$/, /^NOTICE$/,
-  /^tools\/(cws|fix-guard|review-watch)\.mjs$/,
+  /^tools\/(cws|fix-guard|review-watch|usage-limit)\.mjs$/,
 ];
 for (const f of changed) if (SENSITIVE.some((re) => re.test(f))) reasons.push(`changes ${f}`);
 

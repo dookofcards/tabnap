@@ -1,0 +1,47 @@
+name: Store review watch
+
+# Daily: read this extension's Chrome Web Store review status, record changes
+# in release/store-status.json, and open an issue if an update is rejected,
+# warned or taken down. See tools/review-watch.mjs.
+on:
+  schedule:
+    - cron: "23 13 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: review-watch
+  cancel-in-progress: false
+
+permissions:
+  contents: write # commit release/store-status.json
+  issues: write
+  actions: write # keepalive below
+
+jobs:
+  watch:
+    if: vars.CWS_EXTENSION_ID != ''
+    runs-on: ubuntu-latest
+    environment: chrome-web-store
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Read store status
+        env:
+          CWS_SERVICE_ACCOUNT_KEY: ${{ secrets.CWS_SERVICE_ACCOUNT_KEY }}
+          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+        run: node tools/cws.mjs status --out "$RUNNER_TEMP/status.json"
+      - name: Record, alert, resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/review-watch.mjs "$RUNNER_TEMP/status.json"
+      # GitHub disables schedules in public repos after 60 days without
+      # activity. Re-enabling through the API resets that clock, so a quiet
+      # extension keeps being watched.
+      - name: Keepalive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/review-watch.yml/enable"

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>TabNap</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <h1>TabNap</h1>
+      <button id="btn-settings" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
+    </header>
+    <main>
+      <section class="card">
+        <div class="big"><span id="sleeping-count">0</span></div>
+        <div class="label">tabs asleep right now</div>
+      </section>
+      <button id="btn-sleep" class="primary">Sleep all other tabs now</button>
+      <button id="btn-protect">Never sleep this site</button>
+      <p id="site-line" class="muted"></p>
+      <p id="feedback" class="feedback" hidden></p>
+      <section class="pause">
+        <label><input id="opt-paused" type="checkbox" /> Pause automatic sleeping</label>
+        <p id="idle-line" class="muted"></p>
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

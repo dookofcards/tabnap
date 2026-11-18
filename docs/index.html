@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TabNap: Sleep Idle Tabs for Chrome</title>
+    <meta name="description" content="TabNap puts tabs you haven't touched to sleep using Chrome's built-in tab discard. No access to your pages, no network requests, no tracking." />
+    <style>
+      :root { color-scheme: light dark; --accent: #4f46e5; }
+      body { font-family: system-ui, sans-serif; line-height: 1.6; max-width: 720px; margin: 0 auto; padding: 48px 20px 80px; }
+      header { text-align: center; }
+      header img { width: 96px; height: 96px; }
+      h1 { font-size: 40px; margin: 12px 0 4px; }
+      .lead { font-size: 20px; opacity: 0.85; }
+      h2 { margin-top: 40px; }
+      ul { padding-left: 20px; }
+      table { border-collapse: collapse; width: 100%; }
+      td, th { border-bottom: 1px solid #8884; padding: 8px; text-align: left; vertical-align: top; }
+      footer { margin-top: 48px; opacity: 0.7; font-size: 14px; }
+      a { color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="icon128.png" alt="TabNap icon" />
+      <h1>TabNap</h1>
+      <p class="lead">Tabs you haven't touched go to sleep. Your memory wakes up.</p>
+    </header>
+
+    <h2>What it does</h2>
+    <p>
+      TabNap watches how long each tab has been idle and, after the time you
+      choose, asks Chrome to put it to sleep using Chrome's own tab discard.
+      A sleeping tab stays in your tab strip and reloads when you click it.
+    </p>
+
+    <h2>Why it's different</h2>
+    <ul>
+      <li><strong>No access to your pages.</strong> No "read and change all your data on all websites" warning. TabNap needs only tabs, storage and alarms.</li>
+      <li><strong>No network requests</strong> in the free version. No analytics, no ads, no accounts.</li>
+      <li><strong>No remote code.</strong> Everything is bundled.</li>
+      <li>Never touches the tab you're looking at, pinned tabs or tabs playing sound (all configurable).</li>
+    </ul>
+
+    <h2>Free and Pro</h2>
+    <table>
+      <tr><th>Free</th><th>Pro (one-time purchase)</th></tr>
+      <tr>
+        <td>Idle timer, pause, one-click "sleep all other tabs", skip pinned / audible / grouped tabs, up to 5 protected sites</td>
+        <td>Unlimited protected sites, a separate idle timer per site, and a "only sleep while N+ tabs are open" threshold</td>
+      </tr>
+    </table>
+
+    <h2>Install</h2>
+    <p>Get TabNap from the Chrome Web Store (link added once the listing is live).</p>
+
+    <footer>
+      <a href="privacy-policy.html">Privacy policy</a> ·
+      <a href="https://github.com/dookofcards/tabnap/issues">Support</a> ·
+      Made by dookofcards / Extension Tools
+    </footer>
+  </body>
+</html>

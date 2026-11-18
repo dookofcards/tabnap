@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>TabNap settings</title>
+    <link rel="stylesheet" href="options.css" />
+  </head>
+  <body>
+    <main>
+      <header class="top">
+        <img src="../icons/icon48.png" alt="" width="40" height="40" />
+        <div>
+          <h1>TabNap</h1>
+          <p class="tagline">
+            Sleeps tabs you haven't touched, using Chrome's own tab discard.
+            It never reads your pages and makes no network requests.
+          </p>
+        </div>
+      </header>
+
+      <section>
+        <h2>When to sleep tabs</h2>
+        <label class="row">
+          <span>Sleep a tab after it has been idle for</span>
+          <input id="idle-minutes" type="number" min="1" max="1440" step="1" />
+          <span>minutes</span>
+        </label>
+        <label class="check"><input id="opt-paused" type="checkbox" /> Pause automatic sleeping</label>
+        <label class="check"><input id="opt-skip-pinned" type="checkbox" /> Never sleep pinned tabs</label>
+        <label class="check"><input id="opt-skip-audible" type="checkbox" /> Never sleep tabs that are playing sound</label>
+        <label class="check"><input id="opt-skip-grouped" type="checkbox" /> Never sleep tabs in a tab group</label>
+        <p class="hint">
+          A sleeping tab stays in the tab strip and reloads when you click it.
+          The tab you are looking at is never put to sleep.
+        </p>
+      </section>
+
+      <section>
+        <h2>Protected sites</h2>
+        <p class="hint">
+          These sites never sleep (subdomains included).
+          <span id="protect-limit-note"></span>
+        </p>
+        <form id="protect-form" class="inline-form">
+          <input id="protect-input" type="text" placeholder="example.com" autocomplete="off" />
+          <button type="submit">Protect</button>
+        </form>
+        <p id="protect-error" class="error" hidden></p>
+        <ul id="protect-list" class="chips"></ul>
+      </section>
+
+      <section id="pro-section">
+        <h2>Pro <span id="pro-badge" class="badge" hidden>Unlocked</span></h2>
+        <p id="pro-locked" class="locked" hidden></p>
+        <div class="upgrade-row">
+          <button id="btn-upgrade" class="primary" hidden>Unlock Pro (one-time)</button>
+          <span id="upgrade-note" class="hint"></span>
+        </div>
+
+        <fieldset id="pro-fields" disabled>
+          <h3>Per-site timers</h3>
+          <p class="hint">Give a site its own idle time instead of the default.</p>
+          <form id="timeout-form" class="inline-form">
+            <input id="timeout-host" type="text" placeholder="news.example.com" autocomplete="off" />
+            <input id="timeout-minutes" type="number" min="1" max="1440" value="10" />
+            <span>min</span>
+            <button type="submit">Add</button>
+          </form>
+          <ul id="timeout-list" class="chips"></ul>
+
+          <h3>Tab-count threshold</h3>
+          <label class="row">
+            <span>Only sleep tabs while at least</span>
+            <input id="min-tabs" type="number" min="0" max="500" step="1" />
+            <span>tabs are open (0 = always)</span>
+          </label>
+        </fieldset>
+      </section>
+
+      <footer>
+        <p id="stats" class="hint"></p>
+        <p class="hint">
+          <a id="link-home" href="#" target="_blank" rel="noopener">Website</a> ·
+          <a id="link-support" href="#" target="_blank" rel="noopener">Support</a>
+        </p>
+      </footer>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

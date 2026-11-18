@@ -1,0 +1,24 @@
+{
+  "name": "tabnap",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "e2e": "node build.mjs && node tools/e2e.mjs",
+    "package": "node build.mjs --prod"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.280",
+    "esbuild": "^0.24.0",
+    "playwright": "^1.62.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "extpay": "^3.1.2"
+  }
+}

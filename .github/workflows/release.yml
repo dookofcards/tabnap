@@ -1,0 +1,101 @@
+name: Release
+
+# Push a tag like v0.5.2 to release. The tag is the approval: everything after
+# it runs unattended, and the update goes live once Chrome Web Store review
+# passes. Run manually (Actions → Release → Run workflow) for a dry run: the
+# full test suite including a test-mode purchase, then every store check
+# short of uploading.
+#
+# Publishing is gated twice: the release job needs the verify job, and
+# tools/cws.mjs refuses to upload unless e2e-results.json says this exact
+# version passed every Free and Pro test with none skipped.
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    environment: chrome-web-store # for EXTPAY_DEV_PASSWORD
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Check tag, package.json and CHANGELOG agree
+        id: version
+        run: |
+          version=$(node -p "require('./package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json version $version"; exit 1
+          fi
+          grep -q "^## $version " CHANGELOG.md || { echo "::error::CHANGELOG.md has no '## $version' entry"; exit 1; }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      # Build the store zip first and run e2e against that same dist/, so the
+      # bytes that were tested are the bytes that get uploaded.
+      - run: npm run package
+      - run: npx playwright install --with-deps chromium
+      - name: E2E — Free and Pro, including a test-mode purchase
+        env:
+          RUN_PAYMENT_E2E: "1"
+          EXTPAY_DEV_PASSWORD: ${{ secrets.EXTPAY_DEV_PASSWORD }}
+          E2E_RESULTS: e2e-results.json
+        run: xvfb-run --auto-servernum node tools/e2e.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tested-build
+          path: |
+            tabnap-v${{ steps.version.outputs.version }}.zip
+            e2e-results.json
+          if-no-files-found: error
+
+  release:
+    if: vars.CWS_EXTENSION_ID != ''
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: chrome-web-store
+    permissions:
+      contents: write # for the GitHub Release
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      DRY_RUN: ${{ github.ref_type != 'tag' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: tested-build
+      - name: Gate on test results, upload to Chrome Web Store, submit for review
+        env:
+          CWS_SERVICE_ACCOUNT_KEY: ${{ secrets.CWS_SERVICE_ACCOUNT_KEY }}
+          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+        run: |
+          node tools/cws.mjs release --zip "tabnap-v$VERSION.zip" --results e2e-results.json \
+            $([ "$DRY_RUN" = "true" ] && echo --dry-run)
+      - name: Publish GitHub Release with the exact zip that was uploaded
+        if: env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          awk -v v="$VERSION" '$0 ~ "^## " v " " {on=1; next} /^## / {on=0} on' CHANGELOG.md > notes.md
+          gh release create "v$VERSION" "tabnap-v$VERSION.zip" \
+            --title "TabNap $VERSION" --notes-file notes.md --verify-tag

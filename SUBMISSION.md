@@ -6,7 +6,7 @@ Paste these into the Developer Dashboard. Limits are checked below.
 TabNap: Sleep Idle Tabs
 
 ## Short description (≤132; equals the manifest description)
-Puts tabs you haven't touched to sleep with Chrome's built-in tab discard. No access to your pages, no network, no tracking.
+Sleeps idle tabs with Chrome's built-in tab discard. Never reads your pages, no tracking. Free version makes no network requests.
 
 ## Category
 Productivity (Tools)

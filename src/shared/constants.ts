@@ -2,7 +2,7 @@
 // here and nowhere else.
 export const EXTENSION_NAME = "TabNap: Sleep Idle Tabs";
 export const EXTENSION_DESCRIPTION =
-  "Puts tabs you haven't touched to sleep with Chrome's built-in tab discard. No access to your pages, no network, no tracking.";
+  "Sleeps idle tabs with Chrome's built-in tab discard. Never reads your pages, no tracking. Free version makes no network requests.";
 
 /** Outbound links shown in the UI. Nothing here is fetched at runtime. */
 export const HOMEPAGE_URL = "https://dookofcards.github.io/tabnap/";

@@ -1,11 +1,11 @@
 {
   "itemId": "ajcklimoaajcpjpbppnigemmmfelilid",
-  "published": null,
-  "submitted": {
-    "version": "1.0.0",
-    "state": "REJECTED"
+  "published": {
+    "version": "1.0.1",
+    "state": "PUBLISHED"
   },
+  "submitted": null,
   "takenDown": false,
   "warned": false,
-  "checkedAt": "2026-11-19T02:04:56.183Z"
+  "checkedAt": "2026-11-19T21:39:57.728Z"
 }

@@ -16,3 +16,6 @@ JSON/
 e2e-debug/
 e2e-results.json
 .e2e-raw-profile/
+# Any e2e/screenshot scratch (browser profiles, staged copies)
+.e2e-*/
+.e2e-*

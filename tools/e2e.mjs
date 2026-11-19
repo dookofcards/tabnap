@@ -707,6 +707,8 @@ test("a test-mode purchase unlocks pro end to end", async ({ page, context }) =>
     });
   });
   await page.reload();
+  // Stand-in for the user clicking Allow on the tab-address prompt.
+  await page.evaluate(() => { chrome.permissions.request = async () => true; });
   await page.fill("#protect-input", "six.com");
   await page.click("#protect-form button");
   await page.waitForTimeout(500);

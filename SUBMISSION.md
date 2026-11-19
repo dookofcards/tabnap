@@ -48,7 +48,7 @@ Open source (MIT): https://github.com/dookofcards/tabnap
 TabNap puts idle browser tabs to sleep to free memory, using Chrome's built-in tab discard.
 
 ## Permission justifications (each ≤1,000)
-- **tabs:** Needed to read each open tab's address, last-used time and pinned/audible/grouped state so TabNap can decide which tabs are idle and which sites the user protected, and to ask Chrome to discard those tabs. Addresses are used in memory only: never stored, logged or transmitted. TabNap cannot read page content.
+- **tabs (optional permission, requested at runtime):** Requested only when the user adds a protected site or a Pro per-site timer, from the options page. It is used for one thing: reading each tab's URL (`tab.url`) to match tabs against the user's protected-site list and per-site timers, and to show the current site in the popup. Idle detection (last used, pinned, audible, grouped) and `chrome.tabs.discard` work without it, and TabNap puts idle tabs to sleep without it. Addresses are used in memory only: never stored, logged or transmitted. TabNap cannot read page content.
 - **storage:** Saves the user's settings (idle time, protected sites, Pro rules), a local counter of tabs put to sleep, and a local flag that Pro is unlocked. Nothing is sent anywhere.
 - **alarms:** A once-a-minute timer that wakes the background service worker to check for idle tabs. Service workers are stopped by Chrome when idle, so a timer is required.
 - **Content script on https://extensionpay.com/\*:** Only used after the user clicks "Unlock Pro". It lets the ExtensionPay library confirm the purchase to the extension. It does not run on any other site.
@@ -61,7 +61,7 @@ No, all code is bundled.
 - Single purpose and permission justifications: as above.
 - Data collection: tick nothing under "personally identifiable information", "health", "financial and payment information", "authentication information", "personal communications", "location", "web history", "user activity" or "website content". (Payment details are entered on extensionpay.com / Stripe and never reach the extension.)
 - Certifications (tick all three): I do not sell or transfer user data to third parties outside approved use cases; I do not use or transfer user data for purposes unrelated to the item's single purpose; I do not use or transfer user data to determine creditworthiness or for lending purposes.
-- Note for the reviewer: reading tab addresses is local-only and transient, hence "web history" is not collected.
+- Note for the reviewer: version 1.0.0 was rejected for requesting `tabs` up front. In 1.0.1 `tabs` is an optional permission, requested only when a feature needs tab addresses (protected sites, per-site timers). Reading tab addresses is local-only and transient, so "web history" is not collected.
 
 ## URLs
 - Privacy policy: https://dookofcards.github.io/tabnap/privacy-policy.html

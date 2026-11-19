@@ -33,6 +33,17 @@ async function render(): Promise<void> {
     ? "Automatic sleeping is paused."
     : `Tabs sleep after ${settings.idleMinutes} idle minutes.`;
 
+  delete btnProtect.dataset.host;
+  delete btnProtect.dataset.needsAccess;
+  if (active[0] && active[0].url === undefined) {
+    // No tab-address access yet: the options page asks for it (a prompt
+    // opened from the popup would close the popup before it could answer).
+    btnProtect.disabled = false;
+    btnProtect.textContent = "Never sleep a site…";
+    btnProtect.dataset.needsAccess = "1";
+    $("site-line").textContent = "Opens settings, where TabNap asks once to see tab addresses.";
+    return;
+  }
   const host = hostOf(active[0]?.url);
   if (host === null) {
     btnProtect.disabled = true;
@@ -59,6 +70,11 @@ btnSleep.addEventListener("click", async () => {
 });
 
 btnProtect.addEventListener("click", async () => {
+  if (btnProtect.dataset.needsAccess) {
+    await chrome.runtime.openOptionsPage();
+    window.close();
+    return;
+  }
   const host = btnProtect.dataset.host;
   if (!host) return;
   const s = await getSettings();

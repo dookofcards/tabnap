@@ -5,13 +5,29 @@ import { pickTabsToSleep } from "./sleeper.ts";
 
 const STATS_KEY = "stats";
 
+/**
+ * TabNap's own open pages (settings, popup opened in a tab). Without the
+ * optional "tabs" permission their addresses are hidden too, so they're found
+ * through runtime.getContexts(), which needs no permission.
+ */
+async function ownTabIds(): Promise<Set<number>> {
+  try {
+    const contexts = await chrome.runtime.getContexts({ contextTypes: [chrome.runtime.ContextType.TAB] });
+    return new Set(contexts.map((c) => c.tabId).filter((id) => id >= 0));
+  } catch {
+    return new Set();
+  }
+}
+
 export async function sleepTabs(mode: "idle" | "others"): Promise<number> {
-  const [settings, pro, tabs] = await Promise.all([
+  const [settings, pro, tabs, own] = await Promise.all([
     getSettings(),
     hasFeature("unlimitedProtectedSites"),
     chrome.tabs.query({}),
+    ownTabIds(),
   ]);
-  const ids = pickTabsToSleep(tabs, { now: Date.now(), settings, pro, mode });
+  const candidates = tabs.filter((t) => t.id === undefined || !own.has(t.id));
+  const ids = pickTabsToSleep(candidates, { now: Date.now(), settings, pro, mode });
   let slept = 0;
   for (const id of ids) {
     try {

@@ -124,3 +124,49 @@ describe("normalizeSettings", () => {
     expect(normalizeSettings({ protectedSites: "x" as unknown as string[] }).protectedSites).toEqual([]);
   });
 });
+
+// Without the optional "tabs" permission Chrome leaves tab.url undefined.
+describe("without tab-address access (optional tabs permission not granted)", () => {
+  const hidden = (id: number, idleMin: number, extra: Partial<TabLike> = {}): TabLike => ({
+    id, lastAccessed: NOW - idleMin * MIN, ...extra,
+  });
+
+  it("still sleeps idle tabs when there are no site rules", () => {
+    expect(pick([hidden(1, 120), hidden(2, 1)], s({ idleMinutes: 30 }))).toEqual([1]);
+  });
+
+  it("still honours pinned, audible, grouped and active without addresses", () => {
+    const tabs = [
+      hidden(1, 120, { pinned: true }),
+      hidden(2, 120, { audible: true }),
+      hidden(3, 120, { groupId: 4 }),
+      hidden(4, 120, { active: true }),
+      hidden(5, 120),
+    ];
+    expect(pick(tabs, s({ idleMinutes: 30, skipPinned: true, skipAudible: true, skipGrouped: true }))).toEqual([5]);
+  });
+
+  it("sleep-others works without addresses", () => {
+    expect(pick([hidden(1, 0), hidden(2, 0, { active: true })], s(), false, "others")).toEqual([1]);
+  });
+
+  it("leaves hidden tabs awake when protected sites exist (can't tell which tab is protected)", () => {
+    expect(pick([hidden(1, 120), hidden(2, 120)], s({ idleMinutes: 30, protectedSites: ["mail.example.com"] }))).toEqual([]);
+    expect(pick([hidden(1, 0)], s({ protectedSites: ["mail.example.com"] }), false, "others")).toEqual([]);
+  });
+
+  it("leaves hidden tabs awake when Pro per-site timers exist", () => {
+    const settings = s({ idleMinutes: 30, siteTimeouts: [{ host: "docs.example.com", minutes: 240 }] });
+    expect(pick([hidden(1, 120)], settings, true)).toEqual([]);
+  });
+
+  it("Free ignores per-site timers, so hidden tabs sleep normally on Free", () => {
+    const settings = s({ idleMinutes: 30, siteTimeouts: [{ host: "docs.example.com", minutes: 240 }] });
+    expect(pick([hidden(1, 120)], settings, false)).toEqual([1]);
+  });
+
+  it("with addresses visible, behaviour is unchanged", () => {
+    const tabs = [tab(1, "https://mail.example.com/", 120), tab(2, "https://news.example.com/", 120)];
+    expect(pick(tabs, s({ idleMinutes: 30, protectedSites: ["mail.example.com"] }))).toEqual([2]);
+  });
+});

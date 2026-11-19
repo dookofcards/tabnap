@@ -1,8 +1,9 @@
 # TabNap
 
 A Manifest V3 Chrome extension that puts idle tabs to sleep using Chrome's
-built-in tab discard. It needs only the `tabs`, `storage` and `alarms`
-permissions: no host access, no content scripts on websites, and the free
+built-in tab discard. It needs only the `storage` and `alarms`
+permissions, plus an optional `tabs` permission it asks for only when you
+protect a site: no host access, no content scripts on websites, and the free
 version makes no network requests.
 
 - **Free:** idle timer, pause, "sleep all other tabs", skip pinned / audible /

@@ -28,10 +28,20 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://extensionpay.com/*"],
-      "js": ["extpay/ExtPay.js"],
+      "matches": [
+        "https://extensionpay.com/*"
+      ],
+      "js": [
+        "extpay/ExtPay.js"
+      ],
       "run_at": "document_start"
     }
   ],
-  "permissions": ["tabs", "storage", "alarms"]
+  "permissions": [
+    "storage",
+    "alarms"
+  ],
+  "optional_permissions": [
+    "tabs"
+  ]
 }

@@ -76,20 +76,31 @@ export function pickTabsToSleep(tabs: TabLike[], opts: PickOptions): number[] {
     if (settings.paused) return [];
     if (policy.minOpenTabs > 0 && tabs.length < policy.minOpenTabs) return [];
   }
+  // Site rules need tab addresses (the optional "tabs" permission). Without
+  // it Chrome leaves tab.url undefined.
+  const hasSiteRules = policy.protectedSites.length > 0 || policy.siteTimeouts.length > 0;
   const picked: number[] = [];
   for (const tab of tabs) {
     if (tab.id === undefined) continue;
     if (tab.active || tab.discarded) continue;
     if (tab.autoDiscardable === false) continue;
-    const host = hostOf(tab.url);
-    if (host === null) continue;
+    let host: string | null = null;
+    if (tab.url !== undefined) {
+      host = hostOf(tab.url);
+      if (host === null) continue; // a non-web page (chrome://, extension pages)
+    } else if (hasSiteRules) {
+      // Address hidden but the user protects some sites: this tab might be one
+      // of them, so leave it awake rather than guess.
+      continue;
+    }
     if (settings.skipPinned && tab.pinned) continue;
     if (settings.skipAudible && tab.audible) continue;
     if (settings.skipGrouped && tab.groupId !== undefined && tab.groupId >= 0) continue;
-    if (policy.protectedSites.some((p) => hostMatches(host, p))) continue;
+    const site = host;
+    if (site !== null && policy.protectedSites.some((p) => hostMatches(site, p))) continue;
     if (mode === "idle") {
       if (tab.lastAccessed === undefined) continue;
-      const rule = policy.siteTimeouts.find((r) => hostMatches(host, r.host));
+      const rule = site === null ? undefined : policy.siteTimeouts.find((r) => hostMatches(site, r.host));
       const minutes = rule ? rule.minutes : settings.idleMinutes;
       if (now - tab.lastAccessed < minutes * 60_000) continue;
     }

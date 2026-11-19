@@ -18,6 +18,14 @@ await rm(profileDir, { recursive: true, force: true });
 await cp(path.join(root, "dist"), stageDir, { recursive: true });
 await mkdir(outDir, { recursive: true });
 
+// Show the normal state of someone using protected sites, i.e. after they
+// clicked Allow on the tab-address prompt (which automation can't click).
+const stagedManifest = path.join(stageDir, "manifest.json");
+const sm = JSON.parse(await readFile(stagedManifest, "utf8"));
+sm.permissions = [...(sm.permissions ?? []), ...(sm.optional_permissions ?? [])];
+delete sm.optional_permissions;
+await writeFile(stagedManifest, JSON.stringify(sm, null, 2));
+
 const popupHtml = await readFile(path.join(stageDir, "popup", "popup.html"), "utf8");
 await writeFile(
   path.join(stageDir, "popup", "popup-stage.html"),

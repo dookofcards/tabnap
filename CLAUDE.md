@@ -24,9 +24,11 @@ standard apply here unchanged. In short:
    `a free user's session makes no external network requests` guards it.
 5. **ExtPay.js is AGPLv3, the extension is MIT.** It ships as a separate,
    unmodified `dist/extpay/ExtPay.js`, never bundled. See `NOTICE`.
-6. **Permissions stay `tabs`, `storage`, `alarms`**, with no host
-   permissions. An e2e test fails if they grow. Adding any needs the
-   maintainer.
+6. **Permissions stay `storage`, `alarms`, with `tabs` optional**, and no
+   host permissions. `tabs` is requested at runtime only when a site-based
+   feature needs tab addresses: Chrome Web Store rejected 1.0.0 for requesting
+   it up front. Idle sleeping must keep working without it. An e2e test fails
+   if permissions grow. Adding any needs the maintainer.
 7. **Copy stays in sync.** If behaviour changes, update `SUBMISSION.md`,
    `docs/privacy-policy.html` (bump the date), `docs/index.html` and
    `CHANGELOG.md` in the same commit.

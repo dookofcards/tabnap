@@ -44,13 +44,17 @@
     <h2>What TabNap accesses, and why</h2>
     <ul>
       <li>
-        <strong>Tabs:</strong> TabNap reads each open tab's address, when it
-        was last used, and whether it is pinned, playing sound or in a group.
-        It does this on your device only, to decide which tabs have been idle
-        and which sites you protected, and then asks Chrome to put those tabs
-        to sleep. Tab addresses are never stored, logged or transmitted.
-        TabNap cannot read the content of any page and has no host access and
-        no content scripts on websites.
+        <strong>Tabs (optional):</strong> TabNap decides which tabs are idle
+        from when each tab was last used and whether it is pinned, playing sound
+        or in a group. Chrome provides that without any special permission, so
+        TabNap puts idle tabs to sleep without it. Only if you protect a site or
+        set a per-site timer does TabNap ask Chrome for permission to see tab
+        addresses, so it can tell which tabs belong to those sites. Addresses are
+        checked on your device only and are never stored, logged or transmitted.
+        You can withdraw that permission at any time in Chrome's extension
+        settings; TabNap then leaves tabs awake rather than risk sleeping a
+        protected site. TabNap cannot read the content of any page and has no
+        host access and no content scripts on websites.
       </li>
       <li>
         <strong>Storage:</strong> to keep the settings described above.

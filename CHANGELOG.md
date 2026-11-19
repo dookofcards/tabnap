@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.1 — 2026-11-18
+
+- TabNap now installs with only the storage and alarms permissions. It
+  asks to see tab addresses only when you protect a site or set a per-site
+  timer, and idle tabs go to sleep without it.
+- If that permission is declined or withdrawn, protected sites are put on
+  hold and TabNap leaves tabs awake rather than risk sleeping one. The
+  settings page says so and offers an Allow button.
+- TabNap never puts its own pages to sleep.
+
 ## 1.0.0 — 2026-11-18
 
 First release.

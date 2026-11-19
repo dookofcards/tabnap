@@ -7,7 +7,7 @@
 // Tests run inside the options page, which shares the extension origin and
 // service worker with the real thing, so chrome.* behaves exactly as shipped.
 import { chromium } from "playwright";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { cp, readFile, rm, writeFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 import path from "node:path";
 import http from "node:http";
@@ -97,14 +97,33 @@ class Cdp {
   }
 }
 
-async function launchRaw() {
-  const ourName = JSON.parse(await readFile(path.join(dist, "manifest.json"), "utf8")).name;
-  const dir = path.join(root, ".e2e-raw-profile");
+// The optional "tabs" permission (tab addresses) can only be granted through
+// a Chrome prompt, which automation can't click. Tests of address-dependent
+// behaviour (protected sites, per-site timers) therefore run against a copy
+// of the built dist/ that is identical except that its manifest moves the
+// optional permissions into `permissions`, i.e. the state after a user clicks
+// Allow. Everything else runs against the exact shipped build, which has no
+// tab access.
+const distGranted = path.join(root, ".e2e-dist-granted");
+async function grantedCopy() {
+  await rm(distGranted, { recursive: true, force: true });
+  await cp(dist, distGranted, { recursive: true });
+  const file = path.join(distGranted, "manifest.json");
+  const m = JSON.parse(await readFile(file, "utf8"));
+  m.permissions = [...(m.permissions ?? []), ...(m.optional_permissions ?? [])];
+  delete m.optional_permissions;
+  await writeFile(file, JSON.stringify(m, null, 2));
+  return distGranted;
+}
+
+async function launchRaw(extDir = dist, label = "raw") {
+  const ourName = JSON.parse(await readFile(path.join(extDir, "manifest.json"), "utf8")).name;
+  const dir = path.join(root, `.e2e-${label}-profile`);
   await rm(dir, { recursive: true, force: true });
   const child = spawn(chromium.executablePath(), [
     "--no-sandbox", "--no-first-run", "--no-default-browser-check",
     `--user-data-dir=${dir}`, "--remote-debugging-port=0",
-    `--disable-extensions-except=${dist}`, `--load-extension=${dist}`,
+    `--disable-extensions-except=${extDir}`, `--load-extension=${extDir}`,
     "--disable-gpu", "about:blank",
   ], { stdio: "ignore" });
   const portFile = path.join(dir, "DevToolsActivePort");
@@ -173,8 +192,9 @@ async function withTabs(raw, url, hosts, fn, { pinned = [] } = {}) {
       await raw.page.eval((i) => chrome.tabs.update(i, { pinned: true }).then(() => true), ids[hosts.indexOf(host)]);
     }
     // Keep the options tab active so every fixture tab is a background tab.
+    // getCurrent() works with or without tab-address access.
     await raw.page.eval(async () => {
-      const [t] = await chrome.tabs.query({ url: chrome.runtime.getURL("options/options.html") });
+      const t = await chrome.tabs.getCurrent();
       await chrome.tabs.update(t.id, { active: true });
       return true;
     });
@@ -187,7 +207,13 @@ async function withTabs(raw, url, hosts, fn, { pinned = [] } = {}) {
 const activate = (raw, id) => raw.page.eval((i) => chrome.tabs.update(i, { active: true }).then(() => true), id);
 const sweepMsg = (raw, type) => raw.page.eval((t) => chrome.runtime.sendMessage({ type: t }), type);
 
-/** { host: discarded } for every http tab. */
+/** Same fixture tabs, for the shipped build where tab addresses are hidden. */
+const withTabsHidden = withTabs;
+/** [discarded] per tab id, in order. Needs no tab-address access. */
+const sleepMapById = (raw, ids) =>
+  raw.page.eval(async (list) => Promise.all(list.map(async (id) => (await chrome.tabs.get(id)).discarded)), ids);
+
+/** { host: discarded } for every http tab (needs tab access). */
 const sleepMap = (raw) =>
   raw.page.eval(async () =>
     Object.fromEntries(
@@ -223,13 +249,64 @@ test("manifest version matches package.json", async ({ page, pkgVersion }) => {
 
 test("declared permissions have not silently grown", async ({ page }) => {
   const manifest = await page.evaluate(() => chrome.runtime.getManifest());
-  const expected = ["tabs", "storage", "alarms"];
+  // `tabs` is optional: requested only when the user first protects a site
+  // (Chrome Web Store rejected 1.0.0 for requesting it up front).
   assert(
-    JSON.stringify(manifest.permissions) === JSON.stringify(expected),
+    JSON.stringify(manifest.permissions) === JSON.stringify(["storage", "alarms"]),
     `permissions changed: ${JSON.stringify(manifest.permissions)}`,
   );
+  assert(
+    JSON.stringify(manifest.optional_permissions) === JSON.stringify(["tabs"]),
+    `optional permissions changed: ${JSON.stringify(manifest.optional_permissions)}`,
+  );
   assert(manifest.host_permissions === undefined, "host permissions appeared");
-  assert(manifest.optional_permissions === undefined, "optional permissions appeared");
+  const granted = await page.evaluate(() => chrome.permissions.contains({ permissions: ["tabs"] }));
+  assert(granted === false, "the shipped build starts with tab access it never asked for");
+});
+
+// --- Without tab access (the shipped build; nobody has clicked Allow) ---
+
+test("no tab access: Sleep other tabs still works", async ({ raw, url }) => {
+  const access = await raw.page.eval(() => chrome.permissions.contains({ permissions: ["tabs"] }));
+  assert(access === false, "raw shipped build unexpectedly has tab access");
+  const map = await withTabsHidden(raw, url, ["h1.localhost", "h2.localhost", "h3.localhost"], async (ids) => {
+    await activate(raw, ids[2]);
+    const r = await sweepMsg(raw, "sleepOthers");
+    assert(r.slept >= 2, `expected the 2 background tabs to sleep, got ${r.slept}`);
+    return sleepMapById(raw, ids);
+  });
+  assert(map[0] === true && map[1] === true, `background tabs stayed awake: ${JSON.stringify(map)}`);
+  assert(map[2] === false, "the active tab was put to sleep");
+}, { raw: true });
+
+test("no tab access: with protected sites set, TabNap leaves tabs awake rather than guess", async ({ raw, url }) => {
+  await setSettings(raw.page, { protectedSites: ["safe.localhost"] });
+  const map = await withTabsHidden(raw, url, ["safe.localhost", "other.localhost"], async (ids) => {
+    const r = await sweepMsg(raw, "sleepOthers");
+    assert(r.slept === 0, `slept ${r.slept} tab(s) it couldn't check against the protected list`);
+    return sleepMapById(raw, ids);
+  });
+  assert(map.every((d) => d === false), `a tab slept: ${JSON.stringify(map)}`);
+}, { raw: true });
+
+test("no tab access: options asks before protecting a site, and declining adds nothing", async ({ page }) => {
+  await page.reload();
+  await page.evaluate(() => { chrome.permissions.request = async () => false; });
+  await page.fill("#protect-input", "decline.com");
+  await page.click("#protect-form button");
+  await page.waitForTimeout(300);
+  const err = await page.locator("#protect-error").innerText();
+  assert(/tab addresses/i.test(err), `no explanation shown: "${err}"`);
+  const stored = await page.evaluate(async () => (await chrome.storage.sync.get("settings")).settings?.protectedSites ?? []);
+  assert(stored.length === 0, `a site was stored without access: ${JSON.stringify(stored)}`);
+});
+
+test("no tab access: options shows an Allow notice while site rules are on hold", async ({ page }) => {
+  await setSettings(pwTarget(page), { protectedSites: ["held.com"] });
+  await page.reload();
+  await page.waitForTimeout(300);
+  const visible = await page.evaluate(() => !document.getElementById("tab-access-note").hidden);
+  assert(visible, "no notice that protected sites are on hold");
 });
 
 // --- Free core (real tab discards, raw Chrome) ---
@@ -244,7 +321,7 @@ test("free: Sleep other tabs puts background tabs to sleep, never the active one
   });
   assert(map["f1.localhost"] === true && map["f2.localhost"] === true, `background tabs awake: ${JSON.stringify(map)}`);
   assert(map["f3.localhost"] === false, "the active tab was put to sleep");
-}, { raw: true });
+}, { raw: true, tabAccess: "granted" });
 
 test("free: protected sites, pinned tabs and extension pages stay awake", async ({ raw, url }) => {
   await setSettings(raw.page, { protectedSites: ["keep.localhost"] });
@@ -258,7 +335,7 @@ test("free: protected sites, pinned tabs and extension pages stay awake", async 
   assert(map["plain.localhost"] === true, "plain tab stayed awake");
   const extAwake = await raw.page.eval(async () => (await chrome.tabs.query({})).filter((t) => t.url.startsWith("chrome-extension://")).every((t) => !t.discarded));
   assert(extAwake, "an extension page was put to sleep");
-}, { raw: true });
+}, { raw: true, tabAccess: "granted" });
 
 test("free: only five protected sites are enforced", async ({ raw, url }) => {
   const hosts = ["q1", "q2", "q3", "q4", "q5", "q6", "q7"].map((h) => `${h}.localhost`);
@@ -269,7 +346,7 @@ test("free: only five protected sites are enforced", async ({ raw, url }) => {
   });
   for (const h of hosts.slice(0, 5)) assert(map[h] === false, `${h} should be protected on Free`);
   for (const h of hosts.slice(5)) assert(map[h] === true, `${h} is beyond the Free limit and should sleep`);
-}, { raw: true });
+}, { raw: true, tabAccess: "granted" });
 
 test("pro: unlimited protected sites really stay awake", async ({ raw, url }) => {
   await setPro(raw.page, true);
@@ -280,7 +357,7 @@ test("pro: unlimited protected sites really stay awake", async ({ raw, url }) =>
     return sleepMap(raw);
   });
   for (const h of hosts) assert(map[h] === false, `${h} slept despite Pro protection`);
-}, { raw: true });
+}, { raw: true, tabAccess: "granted" });
 
 // One 62 s wait serves every idle-timer scenario, run as phases on the same
 // four tabs with different settings.
@@ -322,7 +399,7 @@ test("idle timer: fresh tabs are left alone, then pause, threshold, Free and Pro
     assert(m["idle-slow.localhost"] === true, "per-site timer still applied after losing Pro");
     assert(m["idle-keep.localhost"] === false, "protected idle tab slept on Free");
   });
-}, { raw: true });
+}, { raw: true, tabAccess: "granted" });
 
 test("free: popup shows the sleeping count and its button works", async ({ raw, url }) => {
   await withTabs(raw, url, ["pop-a.localhost", "pop-b.localhost"], async () => {
@@ -351,6 +428,8 @@ test("free: popup shows the sleeping count and its button works", async ({ raw, 
 test("free: the options page refuses a sixth protected site and explains why", async ({ page }) => {
   await setSettings(pwTarget(page), { protectedSites: ["a.com", "b.com", "c.com", "d.com", "e.com"] });
   await page.reload();
+  // Stand-in for the user clicking Allow on the tab-address prompt.
+  await page.evaluate(() => { chrome.permissions.request = async () => true; });
   await page.fill("#protect-input", "six.com");
   await page.click("#protect-form button");
   await page.waitForTimeout(300);
@@ -376,6 +455,8 @@ test("pro: options fields are locked and explained without an entitlement", asyn
 test("pro: with an entitlement the fields unlock and rules can be saved", async ({ page }) => {
   await setPro(pwTarget(page), true);
   await page.reload();
+  // Stand-in for the user clicking Allow on the tab-address prompt.
+  await page.evaluate(() => { chrome.permissions.request = async () => true; });
   await page.waitForTimeout(300);
   assert(!(await page.evaluate(() => document.getElementById("pro-fields").disabled)), "still locked with Pro");
   await page.fill("#timeout-host", "docs.example.com");
@@ -393,6 +474,8 @@ test("pro: a sixth protected site can be added with an entitlement", async ({ pa
   await setPro(pwTarget(page), true);
   await setSettings(pwTarget(page), { protectedSites: ["a.com", "b.com", "c.com", "d.com", "e.com"] });
   await page.reload();
+  // Stand-in for the user clicking Allow on the tab-address prompt.
+  await page.evaluate(() => { chrome.permissions.request = async () => true; });
   await page.fill("#protect-input", "six.com");
   await page.click("#protect-form button");
   await page.waitForTimeout(400);
@@ -708,7 +791,7 @@ export async function run() {
 
   const failures = [];
   const skipped = [];
-  let rawChrome;
+  const rawChromes = {}; // "shipped" (no tab access) and "granted"
   try {
     let [worker] = context.serviceWorkers();
     if (!worker) worker = await context.waitForEvent("serviceworker");
@@ -719,7 +802,7 @@ export async function run() {
     await page.goto(`chrome-extension://${extId}/options/options.html`);
 
     const ctx = { page, context, extId, worker, pkgVersion, url, raw: undefined };
-    for (const { name, fn, liveExtPay, raw } of tests) {
+    for (const { name, fn, liveExtPay, raw, tabAccess } of tests) {
       if (liveExtPay && !runLive) {
         skipped.push(name);
         console.log(`  SKIP  ${name} (hits ExtensionPay's live API)`);
@@ -735,9 +818,12 @@ export async function run() {
         };
         await page.evaluate(reset);
         if (raw) {
-          rawChrome ??= await launchRaw();
-          await rawChrome.page.eval(reset);
-          ctx.raw = rawChrome;
+          const variant = tabAccess === "granted" ? "granted" : "shipped";
+          rawChromes[variant] ??= variant === "granted"
+            ? await launchRaw(await grantedCopy(), "raw-granted")
+            : await launchRaw(dist, "raw");
+          await rawChromes[variant].page.eval(reset);
+          ctx.raw = rawChromes[variant];
         }
         await fn(ctx);
         console.log(`  PASS  ${name}`);
@@ -756,7 +842,8 @@ export async function run() {
       for (const e of consoleErrors) console.log(`    ${e}`);
     }
   } finally {
-    await rawChrome?.close();
+    for (const r of Object.values(rawChromes)) await r.close();
+    await rm(distGranted, { recursive: true, force: true });
     await context.close();
     server.close();
     await rm(profile, { recursive: true, force: true });

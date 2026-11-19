@@ -9,6 +9,7 @@ import {
 import { getEntitlement } from "../shared/features.ts";
 import { getSettings, updateSettings } from "../shared/settings.ts";
 import { normalizeHost } from "../core/sleeper.ts";
+import { hasTabAccess, requestTabAccess, TAB_ACCESS_EXPLAINED } from "../shared/tabAccess.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -38,6 +39,8 @@ const el = {
   timeoutList: $<HTMLUListElement>("timeout-list"),
   minTabs: $<HTMLInputElement>("min-tabs"),
   stats: $("stats"),
+  tabAccessNote: $("tab-access-note"),
+  btnTabAccess: $<HTMLButtonElement>("btn-tab-access"),
 };
 
 function chip(label: string, onRemove: () => void): HTMLLIElement {
@@ -91,6 +94,10 @@ async function render(): Promise<void> {
     ),
   );
 
+  // Site rules exist but tab addresses aren't visible (declined or revoked).
+  const hasRules = settings.protectedSites.length > 0 || settings.siteTimeouts.length > 0;
+  el.tabAccessNote.hidden = !hasRules || (await hasTabAccess());
+
   el.proFields.disabled = !pro;
   el.proBadge.hidden = !pro;
   el.proLocked.hidden = pro;
@@ -139,6 +146,12 @@ el.protectForm.addEventListener("submit", async (event) => {
     el.protectError.hidden = false;
     return;
   }
+  // First await: Chrome shows the prompt only during the user's click.
+  if (!(await requestTabAccess())) {
+    el.protectError.textContent = TAB_ACCESS_EXPLAINED;
+    el.protectError.hidden = false;
+    return;
+  }
   const [settings, entitlement] = await Promise.all([getSettings(), getEntitlement()]);
   if (settings.protectedSites.includes(host)) {
     el.protectInput.value = "";
@@ -154,11 +167,21 @@ el.protectForm.addEventListener("submit", async (event) => {
   await render();
 });
 
+el.btnTabAccess.addEventListener("click", async () => {
+  if (await requestTabAccess()) await render();
+});
+
 el.timeoutForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!(await getEntitlement()).active) return;
   const host = normalizeHost(el.timeoutHost.value);
   if (host === null) return;
+  // First await: Chrome shows the prompt only during the user's click.
+  if (!(await requestTabAccess())) {
+    el.protectError.textContent = TAB_ACCESS_EXPLAINED;
+    el.protectError.hidden = false;
+    return;
+  }
+  if (!(await getEntitlement()).active) return;
   const s = await getSettings();
   const rest = s.siteTimeouts.filter((r) => r.host !== host);
   await updateSettings({
